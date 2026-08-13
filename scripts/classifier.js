@@ -39,6 +39,62 @@ const FACTUAL_MARKERS = [
 
 const URGENT_MARKERS = ['urgente', 'última hora', 'de última hora', 'breaking news', 'boletim urgente'];
 
+// ---------------------------------------------------------------------------
+// Classificador de CATEGORIA por palavras-chave. Usado como reforço quando a
+// fonte só tem uma categoria "padrão" genérica (normalmente 'acontecimentos'),
+// pra notícias de crime, festa, utilidade pública etc. não ficarem todas
+// empilhadas ali. Não é machine learning — é contagem de palavras-chave, então
+// é auditável e previsível, mas pode errar em casos ambíguos.
+const CATEGORY_MARKERS = {
+  'crimes-e-seguranca': [
+    'furto', 'roubo', 'assalto', 'homicídio', 'homicidio', 'latrocínio', 'latrocinio',
+    'preso em flagrante', 'foi preso', 'presa em flagrante', 'polícia civil', 'policia civil',
+    'polícia militar', 'policia militar', 'tráfico de drogas', 'trafico de drogas',
+    'apreensão de drogas', 'operação policial', 'operacao policial', 'feminicídio', 'feminicidio',
+    'estupro', 'sequestro', 'tiroteio', 'chacina', 'mandado de prisão', 'mandado de prisao',
+    'boletim de ocorrência', 'boletim de ocorrencia', 'suspeito de', 'crime organizado',
+    'delegacia', 'investigação policial', 'investigacao policial', 'corpo foi encontrado'
+  ],
+  'festas-e-eventos': [
+    'festa junina', 'festa de', 'quermesse', 'expocláudio', 'expoclaudio', 'exposição agropecuária',
+    'exposicao agropecuaria', 'festival de', 'procissão', 'procissao', 'folia de reis',
+    'carnaval', 'festa dos caminhoneiros', 'festividades', 'comemoração de', 'comemoracao de',
+    'aniversário da cidade', 'aniversario da cidade', 'reveillon', 'réveillon', 'festa do padroeiro',
+    'romaria', 'arraial', 'quadrilha junina'
+  ],
+  'utilidade-publica': [
+    'previsão do tempo', 'previsao do tempo', 'alerta meteorológico', 'alerta meteorologico',
+    'interdição da via', 'interdicao da via', 'obras na', 'pavimentação', 'pavimentacao',
+    'trânsito na', 'transito na', 'falta de água', 'falta de agua', 'copasa informa',
+    'cemig informa', 'vacinação contra', 'vacinacao contra', 'campanha de vacinação',
+    'campanha de vacinacao', 'mutirão de', 'mutirao de', 'inscrições abertas', 'inscricoes abertas',
+    'concurso público', 'concurso publico', 'vagas de emprego', 'edital nº', 'edital n°',
+    'prazo para', 'processo seletivo', 'estacionamento rotativo'
+  ],
+  'novidades': [
+    'é lançado', 'e lancado', 'foi lançado', 'foi lancado', 'chega ao mercado', 'chega ao brasil',
+    'nova loja', 'inaugura nesta', 'inaugura loja', 'primeira unidade', 'nova versão do',
+    'nova versao do', 'disponível a partir de', 'disponivel a partir de'
+  ]
+};
+
+function classifyCategoryByKeywords(text) {
+  const t = normalize(text);
+  let best = null;
+  let bestHits = 0;
+  for (const [category, markers] of Object.entries(CATEGORY_MARKERS)) {
+    let hits = 0;
+    for (const m of markers) {
+      if (t.includes(normalize(m))) hits++;
+    }
+    if (hits > bestHits) {
+      bestHits = hits;
+      best = category;
+    }
+  }
+  return bestHits > 0 ? best : null;
+}
+
 function normalize(text) {
   return (text || '')
     .toLowerCase()
@@ -140,4 +196,4 @@ function scoreItem({ title, summary, sectionHint, feedCategory, sourceTrust = 50
   };
 }
 
-module.exports = { scoreItem, detectContentType, normalize };
+module.exports = { scoreItem, detectContentType, normalize, classifyCategoryByKeywords };
