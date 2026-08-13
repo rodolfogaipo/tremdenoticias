@@ -23,6 +23,7 @@ const OUTPUT_PATH = path.join(ROOT, 'docs', 'data', 'news.json');
 const MAX_AGE_DAYS = 12;          // até quando um item fica guardado para leitura offline
 const HTML_MAX_LINKS = 12;        // limite de links processados por fonte "html"
 const FETCH_TIMEOUT_MS = 15000;
+const SUMMARY_MAX_LEN = 600;      // limite "macio" do resumo (corta em frase/palavra, não no meio)
 
 const rssParser = new Parser({
   timeout: FETCH_TIMEOUT_MS,
@@ -39,6 +40,21 @@ function hashId(str) {
 function stripHtml(html) {
   if (!html) return '';
   return cheerio.load(`<div>${html}</div>`)('div').text().replace(/\s+/g, ' ').trim();
+}
+
+// Corta um texto de forma "inteligente": tenta parar num fim de frase (. ! ?)
+// dentro do limite; se não achar, corta na última palavra inteira; nunca corta
+// uma palavra ao meio.
+function smartTruncate(text, maxLen) {
+  const clean = (text || '').trim();
+  if (clean.length <= maxLen) return clean;
+  const slice = clean.slice(0, maxLen);
+  const lastSentenceEnd = Math.max(slice.lastIndexOf('. '), slice.lastIndexOf('! '), slice.lastIndexOf('? '));
+  if (lastSentenceEnd > maxLen * 0.4) {
+    return slice.slice(0, lastSentenceEnd + 1).trim();
+  }
+  const lastSpace = slice.lastIndexOf(' ');
+  return (lastSpace > 0 ? slice.slice(0, lastSpace) : slice).trim() + '…';
 }
 
 function normalizeTitleKey(title) {
@@ -67,25 +83,45 @@ async function withTimeout(promise, ms) {
   ]);
 }
 
+// Tenta achar uma imagem "de verdade" dentro de um HTML de conteúdo (usado
+// quando o RSS não traz enclosure/media:content, caso comum do G1 e outros).
+function extractFirstImageFromHtml(html, baseUrl) {
+  if (!html) return null;
+  try {
+    const $ = cheerio.load(html);
+    const img = $('img').first().attr('src') || $('img').first().attr('data-src');
+    if (!img) return null;
+    return baseUrl ? new URL(img, baseUrl).toString() : img;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function fetchRss(source) {
   const feed = await withTimeout(rssParser.parseURL(source.url), FETCH_TIMEOUT_MS);
   const items = [];
   for (const entry of feed.items || []) {
     const title = (entry.title || '').trim();
     if (!title) continue;
-    const summary = stripHtml(entry.contentSnippet || entry.summary || entry.content || '');
+    const rawContentHtml = entry['content:encoded'] || entry.content || entry.summary || '';
+    const summary = stripHtml(entry.contentSnippet || rawContentHtml);
     const link = entry.link || entry.guid || '';
-    const image =
+
+    let image =
       (entry.enclosure && entry.enclosure.url) ||
       (entry['media:content'] && entry['media:content'].$ && entry['media:content'].$.url) ||
+      (entry['media:thumbnail'] && entry['media:thumbnail'].$ && entry['media:thumbnail'].$.url) ||
       null;
+    if (!image) image = extractFirstImageFromHtml(rawContentHtml, link);
+
     const publishedAt = entry.isoDate || entry.pubDate || new Date().toISOString();
     items.push({
       title,
-      summary: summary.slice(0, 400),
+      summary: smartTruncate(summary, SUMMARY_MAX_LEN),
       link,
       image,
       publishedAt,
+      dateIsReal: true, // RSS quase sempre traz data real de publicação
       sectionHint: (entry.categories || []).join(' ')
     });
   }
@@ -125,19 +161,41 @@ async function fetchHtml(source) {
       if (!r.ok) continue;
       const pageHtml = await r.text();
       const $$ = cheerio.load(pageHtml);
+
       const title = $$('meta[property="og:title"]').attr('content') || $$('title').text();
-      const summary = $$('meta[property="og:description"]').attr('content') ||
-                       $$('meta[name="description"]').attr('content') || '';
-      const image = $$('meta[property="og:image"]').attr('content') || null;
-      const publishedAt =
-        $$('meta[property="article:published_time"]').attr('content') || new Date().toISOString();
+
+      let summary = $$('meta[property="og:description"]').attr('content') ||
+                     $$('meta[name="description"]').attr('content') || '';
+      if (!summary || summary.length < 60) {
+        // fallback: pega o primeiro parágrafo "de verdade" do corpo da página
+        const firstParagraph = $$('article p, .content p, .post-content p, .entry-content p, p')
+          .filter((_, el) => $$(el).text().trim().length > 60)
+          .first().text().trim();
+        if (firstParagraph) summary = firstParagraph;
+      }
+
+      const image =
+        $$('meta[property="og:image"]').attr('content') ||
+        $$('meta[name="twitter:image"]').attr('content') ||
+        extractFirstImageFromHtml($$('article').html() || pageHtml, url) ||
+        null;
+
+      // tenta várias formas comuns de expor a data real de publicação
+      const explicitDate =
+        $$('meta[property="article:published_time"]').attr('content') ||
+        $$('meta[itemprop="datePublished"]').attr('content') ||
+        $$('time[datetime]').first().attr('datetime') ||
+        $$('meta[name="date"]').attr('content') ||
+        null;
+
       if (!title) continue;
       items.push({
         title: title.trim(),
-        summary: summary.trim().slice(0, 400),
+        summary: smartTruncate(summary, SUMMARY_MAX_LEN),
         link: url,
         image,
-        publishedAt,
+        publishedAt: explicitDate || new Date().toISOString(),
+        dateIsReal: Boolean(explicitDate),
         sectionHint: ''
       });
     } catch (e) {
@@ -176,6 +234,7 @@ function buildItem(raw) {
     link: raw.link,
     image: raw.image || null,
     publishedAt: new Date(raw.publishedAt).toISOString(),
+    dateIsReal: Boolean(raw.dateIsReal),
     collectedAt: new Date().toISOString(),
     source: source.name,
     sourceId: source.id,
@@ -187,9 +246,40 @@ function buildItem(raw) {
   };
 }
 
+// Evita que a mesma notícia (mesmo link -> mesmo id) "rejuveneça" a cada
+// execução: se já vimos esse id antes e a fonte não tem data real de
+// publicação (dateIsReal=false), reaproveita a data da primeira vez que
+// coletamos, em vez de carimbar "agora" de novo.
+function stabilizeDates(freshItems, previousItems) {
+  const previousById = new Map(previousItems.map(it => [it.id, it]));
+  return freshItems.map(item => {
+    if (item.dateIsReal) return item;
+    const prev = previousById.get(item.id);
+    if (prev) {
+      return { ...item, publishedAt: prev.publishedAt };
+    }
+    return item; // primeira vez que vemos: fica com "agora" mesmo (data de coleta)
+  });
+}
+
 function dedupe(items) {
-  // ordena por confiabilidade desc para manter a melhor versão como "principal"
-  const sorted = [...items].sort((a, b) => b.reliabilityScore - a.reliabilityScore);
+  // 1ª passada: mesmo link (mesmo id) é sempre a mesma notícia — nunca duplica.
+  const byId = new Map();
+  for (const item of items) {
+    const existing = byId.get(item.id);
+    if (!existing) {
+      byId.set(item.id, item);
+    } else {
+      const keep = item.collectedAt > existing.collectedAt ? item : existing;
+      const other = keep === item ? existing : item;
+      keep.alsoReportedBy = [...new Set([...(keep.alsoReportedBy || []), ...(other.alsoReportedBy || [])])];
+      byId.set(item.id, keep);
+    }
+  }
+  const uniqueById = [...byId.values()];
+
+  // 2ª passada: mesma notícia via fontes diferentes (links diferentes, título parecido, mesmo dia)
+  const sorted = uniqueById.sort((a, b) => b.reliabilityScore - a.reliabilityScore);
   const kept = [];
   const keys = sorted.map(it => normalizeTitleKey(it.title));
 
@@ -241,9 +331,11 @@ async function main() {
 
   const results = await Promise.all(activeSources.map(collectFromSource));
   const rawItems = results.flat();
-  const freshItems = rawItems.map(buildItem);
+  const freshItemsRaw = rawItems.map(buildItem);
 
   const previous = loadPrevious();
+  const freshItems = stabilizeDates(freshItemsRaw, previous);
+
   const combined = dedupe([...freshItems, ...previous]);
   const finalItems = pruneOld(combined).sort(
     (a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)
