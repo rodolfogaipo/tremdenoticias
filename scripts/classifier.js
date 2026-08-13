@@ -37,7 +37,7 @@ const FACTUAL_MARKERS = [
   'boletim de ocorrência', 'processo nº', 'lei nº', 'decreto nº'
 ];
 
-const URGENT_MARKERS = ['urgente', 'agora', 'ao vivo', 'última hora', 'de última hora', 'acontece agora'];
+const URGENT_MARKERS = ['urgente', 'última hora', 'de última hora', 'breaking news', 'boletim urgente'];
 
 function normalize(text) {
   return (text || '')
