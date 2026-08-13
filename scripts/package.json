@@ -1,0 +1,14 @@
+{
+  "name": "trem-de-noticias-aggregator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Coletor automático de notícias (RSS + HTML/OpenGraph) com classificador editorial de neutralidade, para o Trem de Notícias.",
+  "type": "commonjs",
+  "scripts": {
+    "aggregate": "node aggregate.js"
+  },
+  "dependencies": {
+    "rss-parser": "^3.13.0",
+    "cheerio": "^1.0.0"
+  }
+}
