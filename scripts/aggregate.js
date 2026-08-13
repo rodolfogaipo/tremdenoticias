@@ -146,7 +146,12 @@ async function fetchHtml(source) {
       const u = new URL(abs);
       if (u.hostname !== base.hostname) return;
       if (/\.(jpg|jpeg|png|gif|pdf|css|js)$/i.test(u.pathname)) return;
-      if (u.pathname === '/' || u.pathname.length < 8) return;
+      if (u.pathname === '/' || u.pathname.length < 12) return;
+      // ignora páginas de arquivo/navegação (ex: .../noticias?ano=2017, .../2018, /tag/, /categoria/, /page/2)
+      const lastSegment = u.pathname.split('/').filter(Boolean).pop() || '';
+      if (/^\d{4}$/.test(lastSegment)) return; // parece um "ano" isolado
+      if (/(^|[?&])(ano|year|page|pagina)=/i.test(u.search)) return;
+      if (/\/(tag|tags|categoria|category|arquivo|archive|page|pagina)\//i.test(u.pathname)) return;
       links.add(abs.split('#')[0]);
     } catch (_) { /* ignore invalid urls */ }
   });
@@ -162,17 +167,29 @@ async function fetchHtml(source) {
       const pageHtml = await r.text();
       const $$ = cheerio.load(pageHtml);
 
-      const title = $$('meta[property="og:title"]').attr('content') || $$('title').text();
+      const title = ($$('meta[property="og:title"]').attr('content') || $$('title').text() || '').trim();
+
+      // rejeita páginas que claramente não são uma notícia (título é só um ano,
+      // um número solto, ou texto genérico de menu/acessibilidade)
+      if (!title || /^\d{1,4}$/.test(title)) continue;
+
+      const NAV_BOILERPLATE = /ir para o (conte[uú]do|menu|busca|rodap[eé])|pular para|acessibilidade/i;
 
       let summary = $$('meta[property="og:description"]').attr('content') ||
                      $$('meta[name="description"]').attr('content') || '';
+      if (summary && NAV_BOILERPLATE.test(summary)) summary = '';
       if (!summary || summary.length < 60) {
-        // fallback: pega o primeiro parágrafo "de verdade" do corpo da página
+        // fallback: pega o primeiro parágrafo "de verdade" do corpo da página,
+        // pulando textos de navegação/acessibilidade
         const firstParagraph = $$('article p, .content p, .post-content p, .entry-content p, p')
-          .filter((_, el) => $$(el).text().trim().length > 60)
+          .filter((_, el) => {
+            const t = $$(el).text().trim();
+            return t.length > 60 && !NAV_BOILERPLATE.test(t);
+          })
           .first().text().trim();
         if (firstParagraph) summary = firstParagraph;
       }
+      if (!summary || NAV_BOILERPLATE.test(summary)) continue; // sem conteúdo de verdade, pula
 
       const image =
         $$('meta[property="og:image"]').attr('content') ||
@@ -188,9 +205,8 @@ async function fetchHtml(source) {
         $$('meta[name="date"]').attr('content') ||
         null;
 
-      if (!title) continue;
       items.push({
-        title: title.trim(),
+        title,
         summary: smartTruncate(summary, SUMMARY_MAX_LEN),
         link: url,
         image,
