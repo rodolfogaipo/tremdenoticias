@@ -42,9 +42,6 @@ function stripHtml(html) {
   return cheerio.load(`<div>${html}</div>`)('div').text().replace(/\s+/g, ' ').trim();
 }
 
-// Corta um texto de forma "inteligente": tenta parar num fim de frase (. ! ?)
-// dentro do limite; se não achar, corta na última palavra inteira; nunca corta
-// uma palavra ao meio.
 function smartTruncate(text, maxLen) {
   const clean = (text || '').trim();
   if (clean.length <= maxLen) return clean;
@@ -83,8 +80,6 @@ async function withTimeout(promise, ms) {
   ]);
 }
 
-// Tenta achar uma imagem "de verdade" dentro de um HTML de conteúdo (usado
-// quando o RSS não traz enclosure/media:content, caso comum do G1 e outros).
 function extractFirstImageFromHtml(html, baseUrl) {
   if (!html) return null;
   try {
@@ -121,7 +116,7 @@ async function fetchRss(source) {
       link,
       image,
       publishedAt,
-      dateIsReal: true, // RSS quase sempre traz data real de publicação
+      dateIsReal: true,
       sectionHint: (entry.categories || []).join(' ')
     });
   }
@@ -141,17 +136,19 @@ async function fetchHtml(source) {
   $('a[href]').each((_, el) => {
     let href = $(el).attr('href');
     if (!href) return;
+    const anchorText = $(el).text().replace(/\s+/g, ' ').trim();
+    if (anchorText.split(' ').length < 5 || anchorText.length < 25) return;
     try {
       const abs = new URL(href, base).toString();
       const u = new URL(abs);
       if (u.hostname !== base.hostname) return;
       if (/\.(jpg|jpeg|png|gif|pdf|css|js)$/i.test(u.pathname)) return;
       if (u.pathname === '/' || u.pathname.length < 12) return;
-      // ignora páginas de arquivo/navegação (ex: .../noticias?ano=2017, .../2018, /tag/, /categoria/, /page/2)
       const lastSegment = u.pathname.split('/').filter(Boolean).pop() || '';
-      if (/^\d{4}$/.test(lastSegment)) return; // parece um "ano" isolado
+      if (/^\d{4}$/.test(lastSegment)) return;
       if (/(^|[?&])(ano|year|page|pagina)=/i.test(u.search)) return;
       if (/\/(tag|tags|categoria|category|arquivo|archive|page|pagina)\//i.test(u.pathname)) return;
+      if (/(regimento|transparencia|licitac|legislac|servidor|ouvidoria|contato|institucional|estrutura|comiss|estatuto|sobre-a|historia)/i.test(u.pathname)) return;
       links.add(abs.split('#')[0]);
     } catch (_) { /* ignore invalid urls */ }
   });
@@ -168,9 +165,6 @@ async function fetchHtml(source) {
       const $$ = cheerio.load(pageHtml);
 
       const title = ($$('meta[property="og:title"]').attr('content') || $$('title').text() || '').trim();
-
-      // rejeita páginas que claramente não são uma notícia (título é só um ano,
-      // um número solto, ou texto genérico de menu/acessibilidade)
       if (!title || /^\d{1,4}$/.test(title)) continue;
 
       const NAV_BOILERPLATE = /ir para o (conte[uú]do|menu|busca|rodap[eé])|pular para|acessibilidade/i;
@@ -179,8 +173,6 @@ async function fetchHtml(source) {
                      $$('meta[name="description"]').attr('content') || '';
       if (summary && NAV_BOILERPLATE.test(summary)) summary = '';
       if (!summary || summary.length < 60) {
-        // fallback: pega o primeiro parágrafo "de verdade" do corpo da página,
-        // pulando textos de navegação/acessibilidade
         const firstParagraph = $$('article p, .content p, .post-content p, .entry-content p, p')
           .filter((_, el) => {
             const t = $$(el).text().trim();
@@ -189,7 +181,7 @@ async function fetchHtml(source) {
           .first().text().trim();
         if (firstParagraph) summary = firstParagraph;
       }
-      if (!summary || NAV_BOILERPLATE.test(summary)) continue; // sem conteúdo de verdade, pula
+      if (!summary || NAV_BOILERPLATE.test(summary)) continue;
 
       const image =
         $$('meta[property="og:image"]').attr('content') ||
@@ -197,7 +189,6 @@ async function fetchHtml(source) {
         extractFirstImageFromHtml($$('article').html() || pageHtml, url) ||
         null;
 
-      // tenta várias formas comuns de expor a data real de publicação
       const explicitDate =
         $$('meta[property="article:published_time"]').attr('content') ||
         $$('meta[itemprop="datePublished"]').attr('content') ||
@@ -262,10 +253,6 @@ function buildItem(raw) {
   };
 }
 
-// Evita que a mesma notícia (mesmo link -> mesmo id) "rejuveneça" a cada
-// execução: se já vimos esse id antes e a fonte não tem data real de
-// publicação (dateIsReal=false), reaproveita a data da primeira vez que
-// coletamos, em vez de carimbar "agora" de novo.
 function stabilizeDates(freshItems, previousItems) {
   const previousById = new Map(previousItems.map(it => [it.id, it]));
   return freshItems.map(item => {
@@ -274,12 +261,11 @@ function stabilizeDates(freshItems, previousItems) {
     if (prev) {
       return { ...item, publishedAt: prev.publishedAt };
     }
-    return item; // primeira vez que vemos: fica com "agora" mesmo (data de coleta)
+    return item;
   });
 }
 
 function dedupe(items) {
-  // 1ª passada: mesmo link (mesmo id) é sempre a mesma notícia — nunca duplica.
   const byId = new Map();
   for (const item of items) {
     const existing = byId.get(item.id);
@@ -294,7 +280,6 @@ function dedupe(items) {
   }
   const uniqueById = [...byId.values()];
 
-  // 2ª passada: mesma notícia via fontes diferentes (links diferentes, título parecido, mesmo dia)
   const sorted = uniqueById.sort((a, b) => b.reliabilityScore - a.reliabilityScore);
   const kept = [];
   const keys = sorted.map(it => normalizeTitleKey(it.title));
