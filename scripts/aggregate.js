@@ -15,7 +15,7 @@ const crypto = require('crypto');
 const Parser = require('rss-parser');
 const cheerio = require('cheerio');
 
-const { scoreItem, normalize } = require('./classifier.js');
+const { scoreItem, normalize, classifyCategoryByKeywords } = require('./classifier.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const SOURCES_PATH = path.join(__dirname, 'sources.json');
@@ -237,6 +237,17 @@ function buildItem(raw) {
     sourceOpinionBias: source.opinion_bias
   });
 
+  // Reforço de categoria: fontes genéricas (ex: G1-Brasil, Folha, CNN, Terra)
+  // jogam tudo em 'acontecimentos' por padrão. Aqui a gente tenta detectar por
+  // palavras-chave se a notícia é, na verdade, crime, festa, utilidade pública
+  // ou novidade, e reclassifica só nesse caso — sem mexer em fontes que já
+  // têm categoria específica e correta (ex: G1-Esporte, Câmara de Cláudio).
+  let category = source.category_default;
+  if (category === 'acontecimentos') {
+    const detected = classifyCategoryByKeywords(`${raw.title} ${raw.summary}`);
+    if (detected) category = detected;
+  }
+
   return {
     id: hashId(raw.link || raw.title + source.id),
     title: raw.title,
@@ -249,7 +260,7 @@ function buildItem(raw) {
     source: source.name,
     sourceId: source.id,
     region: source.region,
-    category: source.category_default,
+    category,
     priority: source.priority || 'normal',
     ...classification,
     alsoReportedBy: []
