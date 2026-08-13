@@ -1,0 +1,37 @@
+name: Coletar notícias automaticamente
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependências do coletor
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: Rodar o coletor de notícias
+        working-directory: scripts
+        run: node aggregate.js
+
+      - name: Publicar novo docs/data/news.json (se mudou)
+        run: |
+          git config user.name "trem-de-noticias-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/data/news.json
+          git diff --staged --quiet && echo "Sem novidades." || git commit -m "chore: atualizar notícias automaticamente"
+          git push
