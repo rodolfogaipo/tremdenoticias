@@ -1,0 +1,241 @@
+{
+  "_comment": "Cadastro inicial de fontes. RSS pode mudar de endereço com o tempo — o aggregate.js ignora e loga (não derruba) qualquer feed que falhar. Adicione/edite fontes aqui ou pelo painel de configuração do app. trust_score e opinion_bias vão de 0 a 100 (quanto maior, mais confiável / mais opinativo).",
+
+  "regions": {
+    "brasil": { "label": "Brasil" },
+    "mundo": { "label": "Mundo" },
+    "minas": { "label": "Minas Gerais" },
+    "claudio": { "label": "Cláudio - MG" },
+    "regiao_claudio": {
+      "label": "Região de Cláudio",
+      "cities": [
+        "Cláudio", "Itaúna", "Divinópolis", "Itapecerica", "Nova Serrana",
+        "Perdigão", "Carmo do Cajuru", "Pitangui", "Santo Antônio do Monte",
+        "Igaratinga", "Pará de Minas", "Conceição do Pará", "Cristais"
+      ],
+      "_comment_cities": "Lista editável no painel: municípios da microrregião de Cláudio/Divinópolis/Itaúna, considerados 'região próxima' para fins de filtro e destaque."
+    }
+  },
+
+  "categories": [
+    "festas-e-eventos", "acontecimentos", "crimes-e-seguranca", "politica",
+    "economia", "esportes", "cultura", "novidades", "tecnologia",
+    "saude", "educacao", "utilidade-publica"
+  ],
+
+  "sources": [
+    {
+      "id": "g1-brasil",
+      "name": "G1 - Brasil",
+      "type": "rss",
+      "url": "https://g1.globo.com/rss/g1/",
+      "region": "brasil",
+      "category_default": "acontecimentos",
+      "trust_score": 80,
+      "opinion_bias": 5,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "g1-politica",
+      "name": "G1 - Política",
+      "type": "rss",
+      "url": "https://g1.globo.com/rss/g1/politica/",
+      "region": "brasil",
+      "category_default": "politica",
+      "trust_score": 78,
+      "opinion_bias": 8,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "g1-economia",
+      "name": "G1 - Economia",
+      "type": "rss",
+      "url": "https://g1.globo.com/rss/g1/economia/",
+      "region": "brasil",
+      "category_default": "economia",
+      "trust_score": 78,
+      "opinion_bias": 5,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "g1-mundo",
+      "name": "G1 - Mundo",
+      "type": "rss",
+      "url": "https://g1.globo.com/rss/g1/mundo/",
+      "region": "mundo",
+      "category_default": "acontecimentos",
+      "trust_score": 78,
+      "opinion_bias": 5,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "bbc-brasil",
+      "name": "BBC News Brasil",
+      "type": "rss",
+      "url": "https://feeds.bbci.co.uk/portuguese/rss.xml",
+      "region": "mundo",
+      "category_default": "acontecimentos",
+      "trust_score": 85,
+      "opinion_bias": 5,
+      "priority": "high",
+      "active": true
+    },
+    {
+      "id": "agencia-brasil-geral",
+      "name": "Agência Brasil - Geral",
+      "type": "rss",
+      "url": "https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml",
+      "region": "brasil",
+      "category_default": "acontecimentos",
+      "trust_score": 82,
+      "opinion_bias": 3,
+      "priority": "high",
+      "note": "Agência pública, texto factual, boa fonte primária para atos oficiais.",
+      "active": true
+    },
+    {
+      "id": "g1-minas",
+      "name": "G1 - Minas Gerais",
+      "type": "rss",
+      "url": "https://g1.globo.com/rss/g1/minas-gerais/",
+      "region": "minas",
+      "category_default": "acontecimentos",
+      "trust_score": 78,
+      "opinion_bias": 5,
+      "priority": "high",
+      "active": true
+    },
+    {
+      "id": "itatiaia",
+      "name": "Rádio Itatiaia",
+      "type": "rss",
+      "url": "https://www.itatiaia.com.br/rss/geral.xml",
+      "region": "minas",
+      "category_default": "acontecimentos",
+      "trust_score": 70,
+      "opinion_bias": 15,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "otempo",
+      "name": "O Tempo",
+      "type": "rss",
+      "url": "https://www.otempo.com.br/rss",
+      "region": "minas",
+      "category_default": "acontecimentos",
+      "trust_score": 68,
+      "opinion_bias": 15,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "diario-do-comercio-mg",
+      "name": "Diário do Comércio (MG)",
+      "type": "rss",
+      "url": "https://diariodocomercio.com.br/feed/",
+      "region": "minas",
+      "category_default": "economia",
+      "trust_score": 60,
+      "opinion_bias": 15,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "prefeitura-claudio",
+      "name": "Prefeitura de Cláudio",
+      "type": "html",
+      "url": "https://www.claudio.mg.gov.br/portal/noticias",
+      "region": "claudio",
+      "category_default": "utilidade-publica",
+      "trust_score": 85,
+      "opinion_bias": 3,
+      "priority": "critical",
+      "note": "Fonte primária/oficial: comunicados, editais, obras e serviços públicos direto da prefeitura.",
+      "active": true
+    },
+    {
+      "id": "camara-claudio",
+      "name": "Câmara Municipal de Cláudio",
+      "type": "html",
+      "url": "https://camaraclaudio.mg.gov.br/noticiasmenu",
+      "region": "claudio",
+      "category_default": "politica",
+      "trust_score": 85,
+      "opinion_bias": 3,
+      "priority": "high",
+      "note": "Fonte primária/oficial do Legislativo municipal (projetos de lei, sessões, atos oficiais).",
+      "active": true
+    },
+    {
+      "id": "tribunaweb-claudio",
+      "name": "TribunaWeb (Jornal Tribuna de Cláudio)",
+      "type": "rss",
+      "url": "https://tribunaweb.blogspot.com/feeds/posts/default?alt=rss",
+      "region": "claudio",
+      "category_default": "acontecimentos",
+      "trust_score": 55,
+      "opinion_bias": 30,
+      "priority": "high",
+      "note": "Blog dos jornais Tribuna do Carmo e Tribuna de Cláudio. Cobertura combativa/opinativa em parte do conteúdo — viés um pouco mais alto por isso.",
+      "active": true
+    },
+    {
+      "id": "divinews-claudio",
+      "name": "DiviNews - Cláudio",
+      "type": "rss",
+      "url": "https://divinews.com/tag/claudio-mg/feed/",
+      "region": "claudio",
+      "category_default": "acontecimentos",
+      "trust_score": 55,
+      "opinion_bias": 20,
+      "priority": "high",
+      "note": "Feed filtrado só pela tag 'claudio-mg' do portal DiviNews (cobre Cláudio e Divinópolis/região).",
+      "active": true
+    },
+    {
+      "id": "guia-claudio-online",
+      "name": "Guia Cláudio Online - Notícias",
+      "type": "html",
+      "url": "https://www.guiaclaudiomg.com.br/noticias",
+      "region": "claudio",
+      "category_default": "acontecimentos",
+      "trust_score": 45,
+      "opinion_bias": 15,
+      "priority": "normal",
+      "note": "Portal de guia comercial/classificados com seção de notícias locais. Qualidade da extração automática pode variar.",
+      "active": true
+    },
+    {
+      "id": "divinews-regiao",
+      "name": "DiviNews - Divinópolis e região",
+      "type": "rss",
+      "url": "https://divinews.com/feed/",
+      "region": "regiao_claudio",
+      "category_default": "acontecimentos",
+      "trust_score": 55,
+      "opinion_bias": 20,
+      "priority": "high",
+      "note": "Feed geral do DiviNews (Divinópolis e Centro-Oeste de MG), cobre a região próxima de Cláudio.",
+      "active": true
+    },
+
+    {
+      "id": "_instagram-only-nao-coletavel",
+      "name": "[NÃO INCLUÍDOS — só existem no Instagram/Facebook]",
+      "type": "rss",
+      "url": "https://exemplo.invalido/nao-usar",
+      "region": "claudio",
+      "category_default": "acontecimentos",
+      "trust_score": 0,
+      "opinion_bias": 0,
+      "priority": "normal",
+      "active": false,
+      "note": "Folha Claudiense (@folhaclaudiense), Jornal Cidade Carinho (@jornalcidadecarinho), Enquanto isso em Cláudio (@enquantoissoemclaudio) e a Rádio Ind FM 107.1 (radioindfm.com.br, site só de player/promoções, sem notícias em texto) não têm um site de notícias público coletável — só postam no Instagram/Facebook, que não permite coleta automática pelos termos de uso da plataforma. 'Jornal A Notícia' encontrado é de Carmo da Mata, não de Cláudio. 'Papiro Online' não foi localizado. Para essas, o jeito é acompanhar manualmente ou publicar você mesmo o que quiser destacar."
+    }
+  ]
+}
