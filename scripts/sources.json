@@ -225,6 +225,142 @@
     },
 
     {
+      "id": "superesportes-capa",
+      "name": "Superesportes",
+      "type": "rss",
+      "url": "https://www.superesportes.com.br/rss/capa_rss/",
+      "region": "brasil",
+      "category_default": "esportes",
+      "trust_score": 65,
+      "opinion_bias": 15,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "superesportes-atletico-mg",
+      "name": "Superesportes - Atlético-MG",
+      "type": "rss",
+      "url": "https://www.mg.superesportes.com.br/rss/noticias/futebol/atletico-mg/rss.xml",
+      "region": "minas",
+      "category_default": "esportes",
+      "trust_score": 65,
+      "opinion_bias": 15,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "superesportes-cruzeiro",
+      "name": "Superesportes - Cruzeiro",
+      "type": "rss",
+      "url": "https://www.mg.superesportes.com.br/rss/noticias/futebol/cruzeiro/rss.xml",
+      "region": "minas",
+      "category_default": "esportes",
+      "trust_score": 65,
+      "opinion_bias": 15,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "g1-esporte",
+      "name": "G1 - Esporte",
+      "type": "rss",
+      "url": "https://g1.globo.com/rss/g1/esporte/",
+      "region": "brasil",
+      "category_default": "esportes",
+      "trust_score": 78,
+      "opinion_bias": 5,
+      "priority": "normal",
+      "note": "Endereço não confirmado 100% — segue o mesmo padrão das outras seções do G1 que já funcionam. Se falhar, aparece só um aviso no log do Actions, sem quebrar o resto.",
+      "active": true
+    },
+    {
+      "id": "cnn-brasil-esportes",
+      "name": "CNN Brasil - Esportes",
+      "type": "html",
+      "url": "https://www.cnnbrasil.com.br/esportes/",
+      "region": "brasil",
+      "category_default": "esportes",
+      "trust_score": 72,
+      "opinion_bias": 10,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "cnn-brasil-geral",
+      "name": "CNN Brasil",
+      "type": "html",
+      "url": "https://www.cnnbrasil.com.br/",
+      "region": "brasil",
+      "category_default": "acontecimentos",
+      "trust_score": 72,
+      "opinion_bias": 10,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "portal-zacarias",
+      "name": "Portal do Zacarias",
+      "type": "html",
+      "url": "https://portaldozacarias.com.br/site/",
+      "region": "brasil",
+      "category_default": "acontecimentos",
+      "trust_score": 40,
+      "opinion_bias": 25,
+      "priority": "normal",
+      "note": "Portal tabloide de Manaus-AM. A home mistura notícia policial/geral com conteúdo adulto — o coletor tem filtro específico pra nunca trazer esse tipo de link, mas por ser um site pequeno e sem padrão fixo, vale checar de vez em quando se algo escapou.",
+      "active": true
+    },
+    {
+      "id": "ge-globo-futebol",
+      "name": "ge.globo - Futebol",
+      "type": "html",
+      "url": "https://ge.globo.com/futebol/",
+      "region": "brasil",
+      "category_default": "esportes",
+      "trust_score": 78,
+      "opinion_bias": 5,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "terra-noticias",
+      "name": "Terra - Notícias",
+      "type": "html",
+      "url": "https://www.terra.com.br/noticias/",
+      "region": "brasil",
+      "category_default": "acontecimentos",
+      "trust_score": 60,
+      "opinion_bias": 15,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "terra-esportes",
+      "name": "Terra - Futebol",
+      "type": "html",
+      "url": "https://www.terra.com.br/esportes/futebol/",
+      "region": "brasil",
+      "category_default": "esportes",
+      "trust_score": 60,
+      "opinion_bias": 15,
+      "priority": "normal",
+      "active": true
+    },
+    {
+      "id": "revista-oeste",
+      "name": "Revista Oeste",
+      "type": "rss",
+      "url": "https://revistaoeste.com/feed/",
+      "region": "brasil",
+      "category_default": "politica",
+      "trust_score": 55,
+      "opinion_bias": 45,
+      "priority": "normal",
+      "note": "Revista com linha editorial declaradamente conservadora/opinativa (definição dos próprios fundadores) e criticada por parte da imprensa como fonte de desinformação, o que a publicação contesta. Viés alto cadastrado de propósito — no filtro editorial 'Alto' do app, o conteúdo dela fica mais discreto; sinta-se à vontade pra ajustar o trust_score/opinion_bias se achar que não reflete bem.",
+      "active": true
+    },
+
+    {
       "id": "_instagram-only-nao-coletavel",
       "name": "[NÃO INCLUÍDOS — só existem no Instagram/Facebook]",
       "type": "rss",
@@ -235,7 +371,7 @@
       "opinion_bias": 0,
       "priority": "normal",
       "active": false,
-      "note": "Folha Claudiense (@folhaclaudiense), Jornal Cidade Carinho (@jornalcidadecarinho), Enquanto isso em Cláudio (@enquantoissoemclaudio) e a Rádio Ind FM 107.1 (radioindfm.com.br, site só de player/promoções, sem notícias em texto) não têm um site de notícias público coletável — só postam no Instagram/Facebook, que não permite coleta automática pelos termos de uso da plataforma. 'Jornal A Notícia' encontrado é de Carmo da Mata, não de Cláudio. 'Papiro Online' não foi localizado. Para essas, o jeito é acompanhar manualmente ou publicar você mesmo o que quiser destacar."
+      "note": "Folha Claudiense (@folhaclaudiense), Jornal Cidade Carinho (@jornalcidadecarinho), Enquanto isso em Cláudio (@enquantoissoemclaudio) e a Rádio Ind FM 107.1 (só player/promoções) não têm site de notícias público coletável — só postam em redes sociais, que não permitem coleta automática pelos termos de uso da plataforma. 'Jornal A Notícia' encontrado é de Carmo da Mata, não de Cláudio. 'Papiro Online' não foi localizado."
     }
   ]
 }
