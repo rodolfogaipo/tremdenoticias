@@ -20,10 +20,10 @@ const { scoreItem, normalize } = require('./classifier.js');
 const ROOT = path.resolve(__dirname, '..');
 const SOURCES_PATH = path.join(__dirname, 'sources.json');
 const OUTPUT_PATH = path.join(ROOT, 'docs', 'data', 'news.json');
-const MAX_AGE_DAYS = 12;          // até quando um item fica guardado para leitura offline
-const HTML_MAX_LINKS = 12;        // limite de links processados por fonte "html"
+const MAX_AGE_DAYS = 12;
+const HTML_MAX_LINKS = 12;
 const FETCH_TIMEOUT_MS = 15000;
-const SUMMARY_MAX_LEN = 600;      // limite "macio" do resumo (corta em frase/palavra, não no meio)
+const SUMMARY_MAX_LEN = 600;
 
 const rssParser = new Parser({
   timeout: FETCH_TIMEOUT_MS,
@@ -149,6 +149,7 @@ async function fetchHtml(source) {
       if (/(^|[?&])(ano|year|page|pagina)=/i.test(u.search)) return;
       if (/\/(tag|tags|categoria|category|arquivo|archive|page|pagina)\//i.test(u.pathname)) return;
       if (/(regimento|transparencia|licitac|legislac|servidor|ouvidoria|contato|institucional|estrutura|comiss|estatuto|sobre-a|historia)/i.test(u.pathname)) return;
+      if (/(nua|nudez|pelada|sensual|erotic|onlyfans|adulto|boquete|sexo|nsfw|hot-|-hot\b)/i.test(u.pathname + ' ' + anchorText.toLowerCase())) return;
       links.add(abs.split('#')[0]);
     } catch (_) { /* ignore invalid urls */ }
   });
@@ -165,7 +166,9 @@ async function fetchHtml(source) {
       const $$ = cheerio.load(pageHtml);
 
       const title = ($$('meta[property="og:title"]').attr('content') || $$('title').text() || '').trim();
+
       if (!title || /^\d{1,4}$/.test(title)) continue;
+      if (/(nua|nudez|pelada|sensual|erotic|onlyfans|boquete|nsfw)/i.test(title.toLowerCase())) continue;
 
       const NAV_BOILERPLATE = /ir para o (conte[uú]do|menu|busca|rodap[eé])|pular para|acessibilidade/i;
 
