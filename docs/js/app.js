@@ -377,6 +377,7 @@ function closeReader() {
   document.getElementById('readerSheet').classList.remove('open');
 }
 document.getElementById('sheetBackdrop').addEventListener('click', closeReader);
+document.getElementById('sheetCloseBtn').addEventListener('click', closeReader);
 
 function shareItem(item) {
   if (navigator.share) {
@@ -442,6 +443,7 @@ document.getElementById('refreshBtn').addEventListener('click', () => loadData(t
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    closeReader();
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     ['viewFeed', 'viewSaved', 'viewHistory', 'viewSettings'].forEach(id => {

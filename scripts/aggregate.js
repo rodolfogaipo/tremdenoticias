@@ -178,8 +178,9 @@ async function fetchHtml(source) {
     const anchorText = $(el).text().replace(/\s+/g, ' ').trim();
     // notícias de verdade têm o título inteiro como texto do link (uma frase);
     // itens de menu/institucionais ("Anteriores", "Regimento Interno", "Contato")
-    // são curtos — isso filtra a maior parte do lixo de navegação.
-    if (anchorText.split(' ').length < 5 || anchorText.length < 25) return;
+    // são curtos — isso filtra a maior parte do lixo de navegação, sem cortar
+    // manchetes de esporte que tendem a ser mais curtas ("Cruzeiro vence o Atlético").
+    if (anchorText.split(' ').length < 4 || anchorText.length < 18) return;
     try {
       const abs = new URL(href, base).toString();
       const u = new URL(abs);

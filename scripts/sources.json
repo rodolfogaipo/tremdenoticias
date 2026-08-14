@@ -265,6 +265,19 @@
       "active": true
     },
     {
+      "id": "superesportes-america-mg",
+      "name": "Superesportes - América-MG",
+      "type": "html",
+      "url": "https://www.mg.superesportes.com.br/futebol/america-mg/",
+      "region": "minas",
+      "category_default": "esportes",
+      "trust_score": 62,
+      "opinion_bias": 15,
+      "priority": "normal",
+      "note": "Segue o mesmo padrão de URL do Atlético-MG e Cruzeiro no Superesportes.",
+      "active": true
+    },
+    {
       "id": "g1-esporte",
       "name": "G1 - Esporte",
       "type": "rss",
