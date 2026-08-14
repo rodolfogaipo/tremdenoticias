@@ -104,7 +104,12 @@ async function loadData(isRefresh) {
   const btn = document.getElementById('refreshBtn');
   if (isRefresh) btn.classList.add('spinning');
   try {
-    const res = await fetch(DATA_URL, { cache: isRefresh ? 'reload' : 'default' });
+    // ?fresh=1 avisa o service worker (ver docs/service-worker.js) que essa
+    // é uma atualização pedida na hora pelo botão — sem isso, ele mostrava o
+    // cache velho e só atualizava "pra próxima vez", como se o botão não
+    // funcionasse de verdade.
+    const url = isRefresh ? `${DATA_URL}?fresh=${Date.now()}` : DATA_URL;
+    const res = await fetch(url);
     const json = await res.json();
     state.data = json;
     renderAll();

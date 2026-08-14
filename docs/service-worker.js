@@ -4,7 +4,7 @@
    - data/news.json: stale-while-revalidate (mostra cache na hora,
      atualiza em segundo plano quando há internet) */
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const SHELL_CACHE = `tn-shell-${VERSION}`;
 const DATA_CACHE = `tn-data-${VERSION}`;
 
@@ -48,12 +48,34 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
   if (isDataRequest(url)) {
-    // stale-while-revalidate
+    // chave de cache "limpa", sem o "?fresh=..." usado pelo botão Atualizar —
+    // assim carregamento normal e atualização manual compartilham o mesmo cache
+    const canonicalUrl = url.origin + url.pathname;
+    const forceFresh = url.searchParams.has('fresh');
+
     event.respondWith(
       caches.open(DATA_CACHE).then(async (cache) => {
-        const cached = await cache.match(event.request);
-        const network = fetch(event.request)
-          .then(res => { if (res.ok) cache.put(event.request, res.clone()); return res; })
+        if (forceFresh) {
+          // botão "Atualizar": busca na rede AGORA e só volta pra tela quando
+          // tiver a resposta de verdade (nada de "atualiza só na próxima vez")
+          try {
+            const res = await fetch(event.request);
+            if (res.ok) cache.put(canonicalUrl, res.clone());
+            return res;
+          } catch (_) {
+            const cached = await cache.match(canonicalUrl);
+            return cached || new Response(
+              JSON.stringify({ items: [], generatedAt: null, error: 'offline-sem-cache' }),
+              { headers: { 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+
+        // carregamento normal: stale-while-revalidate (mostra cache na hora,
+        // atualiza em segundo plano pra próxima visita)
+        const cached = await cache.match(canonicalUrl);
+        const network = fetch(canonicalUrl)
+          .then(res => { if (res.ok) cache.put(canonicalUrl, res.clone()); return res; })
           .catch(() => null);
         return cached || (await network) || new Response(
           JSON.stringify({ items: [], generatedAt: null, error: 'offline-sem-cache' }),
