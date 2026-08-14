@@ -196,7 +196,7 @@
       "trust_score": 55,
       "opinion_bias": 20,
       "priority": "high",
-      "note": "Feed filtrado só pela tag 'claudio-mg' do portal DiviNews (cobre Cláudio e Divinópolis/região).",
+      "note": "Feed filtrado só pela tag 'claudio-mg' do portal DiviNews (cobre Cláudio e Divinópolis/região). Esse site bloqueia com erro 403 quando detecta que não é um navegador de verdade — melhorei os cabeçalhos da requisição pra tentar contornar, mas pode continuar falhando se o bloqueio for mais rígido (ex: Cloudflare com desafio JavaScript, que não dá pra passar sem um navegador automatizado de verdade).",
       "active": true
     },
     {
@@ -222,7 +222,7 @@
       "trust_score": 55,
       "opinion_bias": 20,
       "priority": "high",
-      "note": "Feed geral do DiviNews (Divinópolis e Centro-Oeste de MG), cobre a região próxima de Cláudio.",
+      "note": "Feed geral do DiviNews (Divinópolis e Centro-Oeste de MG), cobre a região próxima de Cláudio. Mesmo bloqueio 403 do item acima — cabeçalhos melhorados, mas pode continuar falhando.",
       "active": true
     },
 
@@ -405,13 +405,14 @@
     {
       "id": "r7-noticias",
       "name": "R7",
-      "type": "rss",
-      "url": "https://noticias.r7.com/feed.xml",
+      "type": "html",
+      "url": "https://www.r7.com/",
       "region": "brasil",
       "category_default": "acontecimentos",
       "trust_score": 68,
       "opinion_bias": 12,
       "priority": "normal",
+      "note": "RSS não achado com endereço confiável (404) — trocado para leitura da página inicial.",
       "active": true
     },
     {
@@ -501,7 +502,8 @@
       "trust_score": 72,
       "opinion_bias": 10,
       "priority": "normal",
-      "active": true
+      "note": "Desativado: o site carrega o conteúdo via JavaScript (não aparece nada no HTML puro que o robô lê), então voltou 0 notícias em todas as tentativas. Sem usar um navegador automatizado de verdade (fora do escopo deste projeto), não dá pra coletar daqui. Lance!, ge.globo e Superesportes já cobrem esporte.",
+      "active": false
     },
     {
       "id": "tecmundo",
@@ -561,7 +563,8 @@
       "trust_score": 88,
       "opinion_bias": 3,
       "priority": "normal",
-      "note": "Agência de notícias científicas da Fundação de Amparo à Pesquisa do Estado de São Paulo — fonte pública e factual sobre ciência e pesquisa. Não existe categoria 'ciência' separada no app, então cai em 'tecnologia'.",
+      "lenientXml": true,
+      "note": "Agência de notícias científicas da Fundação de Amparo à Pesquisa do Estado de São Paulo — fonte pública e factual sobre ciência e pesquisa. O XML desse feed vem levemente mal formado do lado do site; usa um leitor 'tolerante' isolado, que não afeta as outras fontes. Não existe categoria 'ciência' separada no app, então cai em 'tecnologia'.",
       "active": true
     },
     {
@@ -601,7 +604,7 @@
       "trust_score": 72,
       "opinion_bias": 10,
       "priority": "normal",
-      "note": "Portal especializado em jornalismo sobre inovações educacionais no Brasil.",
+      "note": "Portal especializado em jornalismo sobre inovações educacionais no Brasil. Vinha bloqueando com erro 403 — cabeçalhos melhorados, mas pode continuar falhando se o bloqueio for mais rígido.",
       "active": true
     },
     {
@@ -620,13 +623,14 @@
     {
       "id": "infomoney",
       "name": "InfoMoney",
-      "type": "rss",
-      "url": "https://www.infomoney.com.br/ultimas-noticias/feed",
+      "type": "html",
+      "url": "https://www.infomoney.com.br/ultimas-noticias/",
       "region": "brasil",
       "category_default": "economia",
       "trust_score": 72,
       "opinion_bias": 8,
       "priority": "normal",
+      "note": "O RSS conectava mas voltava 0 notícias — trocado para leitura da página inicial de últimas notícias.",
       "active": true
     },
     {

@@ -25,17 +25,24 @@ const HTML_MAX_LINKS = 12;        // limite de links processados por fonte "html
 const FETCH_TIMEOUT_MS = 15000;
 const SUMMARY_MAX_LEN = 600;      // limite "macio" do resumo (corta em frase/palavra, não no meio)
 
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'
+};
+
 const rssParser = new Parser({
   timeout: FETCH_TIMEOUT_MS,
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-    'Accept': 'application/rss+xml, application/xml, text/xml, */*'
-  }
-  // OBS: já tivemos "xml2js: { strict:false }" aqui pra tentar salvar o feed
-  // quebrado do Superesportes, mas isso corrompia silenciosamente feeds BEM
-  // formados (G1, BBC, Folha...) — o título vinha vazio e a notícia era
-  // descartada sem nenhum aviso no log. Removido. O Superesportes agora usa
-  // modo "html" em vez de RSS, então não precisa mais desse ajuste.
+  headers: { ...BROWSER_HEADERS, 'Accept': 'application/rss+xml, application/xml, text/xml, */*' }
+});
+
+// Parser "tolerante": só usado nas fontes marcadas com lenientXml:true no
+// sources.json, quando o próprio site manda um XML levemente inválido
+// (ex: Agência FAPESP, Superesportes antigo). Fica isolado do parser normal
+// pra nunca mais quebrar silenciosamente feeds bem formados como G1/BBC.
+const lenientRssParser = new Parser({
+  timeout: FETCH_TIMEOUT_MS,
+  headers: { ...BROWSER_HEADERS, 'Accept': 'application/rss+xml, application/xml, text/xml, */*' },
+  xml2js: { strict: false, trim: true }
 });
 
 function log(...args) { console.log('[aggregate]', ...args); }
@@ -150,7 +157,8 @@ async function fetchTextSmart(url, headers) {
 }
 
 async function fetchRss(source) {
-  const feed = await withTimeout(rssParser.parseURL(source.url), FETCH_TIMEOUT_MS);
+  const parser = source.lenientXml ? lenientRssParser : rssParser;
+  const feed = await withTimeout(parser.parseURL(source.url), FETCH_TIMEOUT_MS);
   const items = [];
   for (const entry of feed.items || []) {
     try {
@@ -185,7 +193,7 @@ async function fetchRss(source) {
 }
 
 async function fetchHtml(source) {
-  const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' };
+  const headers = { ...BROWSER_HEADERS, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' };
   const { text: html } = await fetchTextSmart(source.url, headers);
   const $ = cheerio.load(html);
   const base = new URL(source.url);
@@ -212,6 +220,10 @@ async function fetchHtml(source) {
       if (/(^|[?&])(ano|year|page|pagina)=/i.test(u.search)) return;
       if (/\/(tag|tags|categoria|category|arquivo|archive|page|pagina)\//i.test(u.pathname)) return;
       if (/(regimento|transparencia|licitac|legislac|servidor|ouvidoria|contato|institucional|estrutura|comiss|estatuto|sobre-a|historia)/i.test(u.pathname)) return;
+      // páginas "especiais"/históricas permanentes (hubs de campeonato, retrospectivas)
+      // não são notícia do dia, mesmo linkadas na home o tempo todo
+      if (/(campeonatos|especiais|especial|retrospectiva|historia|memoria|relembre|hall-da-fama|penta|tetra|tricampeao|bicampeao)/i.test(u.pathname)) return;
+      if (/\b(19\d{2}|20[0-2]\d)\b/.test(u.pathname)) return; // ano antigo dentro do endereço = provável página histórica
       // conteúdo adulto/sensual não é notícia — nunca deixa passar, mesmo que o site misture isso na home
       if (/(nua|nudez|pelada|sensual|erotic|onlyfans|adulto|boquete|sexo|nsfw|hot-|-hot\b)/i.test(u.pathname + ' ' + anchorText.toLowerCase())) return;
       links.add(abs.split('#')[0]);
@@ -233,6 +245,9 @@ async function fetchHtml(source) {
       // um número solto, texto genérico de menu/acessibilidade, ou conteúdo adulto)
       if (!title || /^\d{1,4}$/.test(title)) continue;
       if (/(nua|nudez|pelada|sensual|erotic|onlyfans|boquete|nsfw)/i.test(title.toLowerCase())) continue;
+      // títulos de página histórica/especial ("Cruzeiro pentacampeão", "tetracampeão"),
+      // sem indicação de data — não são notícia do dia
+      if (/\b(pentacampe[aã]o|tetracampe[aã]o|tricampe[aã]o|bicampe[aã]o|relembre|retrospectiva)\b/i.test(title)) continue;
 
       // páginas "especiais"/institucionais que citam um ano antigo no título
       // (ex: "Atlético Campeão da Copa do Brasil 2014") não são notícia do dia —
@@ -291,14 +306,21 @@ async function fetchHtml(source) {
 }
 
 async function collectFromSource(source) {
-  try {
-    const raw = source.type === 'html' ? await fetchHtml(source) : await fetchRss(source);
-    log(`${source.name}: ${raw.length} itens brutos`);
-    return raw.map(r => ({ ...r, source }));
-  } catch (e) {
-    warn(`${source.name} falhou (${source.url}): ${e.message}`);
-    return [];
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const raw = source.type === 'html' ? await fetchHtml(source) : await fetchRss(source);
+      log(`${source.name}: ${raw.length} itens brutos`);
+      return raw.map(r => ({ ...r, source }));
+    } catch (e) {
+      if (attempt === 2) {
+        warn(`${source.name} falhou (${source.url}): ${e.message}`);
+        return [];
+      }
+      // 1ª falha pode ser passageira (rede instável do próprio site) — tenta mais uma vez
+      await new Promise(r => setTimeout(r, 1500));
+    }
   }
+  return [];
 }
 
 // Converte qualquer coisa em data válida; se vier algo quebrado (data mal
