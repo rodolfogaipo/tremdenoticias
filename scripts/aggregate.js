@@ -37,6 +37,14 @@ const rssParser = new Parser({
 function log(...args) { console.log('[aggregate]', ...args); }
 function warn(...args) { console.warn('[aggregate][aviso]', ...args); }
 
+// Watchdog de segurança: se por qualquer motivo o script travar em algum
+// lugar (mesmo antes de terminar a coleta), força o encerramento em 4 min
+// em vez de deixar o GitHub Actions travado por horas.
+const watchdog = setTimeout(() => {
+  console.error('[aggregate] Watchdog: script demorou demais (4 min), forçando saída.');
+  process.exit(1);
+}, 4 * 60 * 1000);
+
 function hashId(str) {
   return crypto.createHash('sha1').update(str).digest('hex').slice(0, 16);
 }
@@ -415,6 +423,12 @@ async function main() {
   fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(output, null, 2), 'utf-8');
   log(`Gravado ${OUTPUT_PATH} com ${finalItems.length} notícias (de ${rawItems.length} brutas).`);
+
+  // Força o processo a terminar aqui. Sem isso, se alguma conexão de rede
+  // ficar "pendurada" (servidor que não fecha a conexão direito), o Node.js
+  // fica esperando pra sempre e o GitHub Actions trava por horas mesmo já
+  // tendo o arquivo salvo com sucesso.
+  process.exit(0);
 }
 
 main().catch(err => {
