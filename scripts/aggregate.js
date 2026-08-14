@@ -301,6 +301,14 @@ async function collectFromSource(source) {
   }
 }
 
+// Converte qualquer coisa em data válida; se vier algo quebrado (data mal
+// formatada de algum site), cai pra "agora" em vez de derrubar o script inteiro.
+function safeISODate(value) {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return new Date().toISOString();
+  return d.toISOString();
+}
+
 function buildItem(raw) {
   const { source } = raw;
   const classification = scoreItem({
@@ -329,7 +337,7 @@ function buildItem(raw) {
     summary: raw.summary,
     link: raw.link,
     image: raw.image || null,
-    publishedAt: new Date(raw.publishedAt).toISOString(),
+    publishedAt: safeISODate(raw.publishedAt),
     dateIsReal: Boolean(raw.dateIsReal),
     collectedAt: new Date().toISOString(),
     source: source.name,
@@ -427,7 +435,14 @@ async function main() {
 
   const results = await Promise.all(activeSources.map(collectFromSource));
   const rawItems = results.flat();
-  const freshItemsRaw = rawItems.map(buildItem);
+  const freshItemsRaw = [];
+  for (const raw of rawItems) {
+    try {
+      freshItemsRaw.push(buildItem(raw));
+    } catch (e) {
+      warn(`Item descartado por erro ao processar ("${raw.title || 'sem título'}"): ${e.message}`);
+    }
+  }
 
   const previous = loadPrevious();
   const freshItems = stabilizeDates(freshItemsRaw, previous);
