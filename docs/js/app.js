@@ -162,6 +162,11 @@ function passesEditorialFilter(item) {
   return item.contentType === 'noticia' || item.contentType === 'informe';
 }
 
+function priorityRank(item) {
+  const p = { critical: 0, high: 1, normal: 2 }[item.priority] ?? 2;
+  return p;
+}
+
 function getFilteredItems() {
   if (!state.data) return [];
   const blocked = new Set(getBlockedSources());
@@ -195,6 +200,10 @@ function getFilteredItems() {
       if (aLocal !== bLocal) return bLocal - aLocal;
     }
     if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
+    if (state.category === 'esportes' || (state.category === 'todas' && a.category === 'esportes' && b.category === 'esportes')) {
+      const pr = priorityRank(a) - priorityRank(b);
+      if (pr !== 0) return pr;
+    }
     if (biasFilterLevel() === 1) {
       const aOp = a.contentType !== 'noticia' ? 1 : 0;
       const bOp = b.contentType !== 'noticia' ? 1 : 0;
@@ -402,6 +411,14 @@ function checkUrgentNotifications(items) {
 }
 
 /* ---------------- Nav / tabs ---------------- */
+function goToFeedTab() {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.nav-btn[data-view="viewFeed"]').classList.add('active');
+  ['viewFeed', 'viewSaved', 'viewHistory', 'viewSettings'].forEach(id => {
+    document.getElementById(id).style.display = id === 'viewFeed' ? 'block' : 'none';
+  });
+}
+
 function buildLinesNav() {
   const nav = document.getElementById('linesNav');
   nav.innerHTML = REGION_ORDER.map(r => `
@@ -412,6 +429,7 @@ function buildLinesNav() {
     btn.addEventListener('click', () => {
       state.region = btn.dataset.region;
       localStorage.setItem(STORAGE_KEYS.region, state.region);
+      goToFeedTab();
       buildLinesNav();
       renderFeed();
     });
@@ -429,6 +447,7 @@ function buildCategoryRow() {
     btn.addEventListener('click', () => {
       state.category = btn.dataset.cat;
       localStorage.setItem(STORAGE_KEYS.category, state.category);
+      goToFeedTab();
       buildCategoryRow();
       renderFeed();
     });

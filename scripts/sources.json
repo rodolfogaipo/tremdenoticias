@@ -236,7 +236,8 @@
       "trust_score": 65,
       "opinion_bias": 15,
       "priority": "normal",
-      "active": true
+      "note": "Esse RSS tem um erro de XML mal-formado no lado do site ('Attribute without value') que trava a leitura — desativado. Os times individuais (Atlético-MG, Cruzeiro, América-MG) e o ge.globo já cobrem futebol de sobra.",
+      "active": false
     },
     {
       "id": "superesportes-atletico-mg",
@@ -247,8 +248,8 @@
       "category_default": "esportes",
       "trust_score": 65,
       "opinion_bias": 15,
-      "priority": "normal",
-      "note": "RSS não existia (404) — trocado para leitura da página do time, que existe de verdade.",
+      "priority": "high",
+      "note": "RSS não existia (404) — trocado para leitura da página do time, que existe de verdade. Prioridade alta a pedido do usuário (torcedor do Atlético).",
       "active": true
     },
     {
@@ -639,6 +640,59 @@
       "opinion_bias": 10,
       "priority": "normal",
       "note": "Cultura pop: cinema, séries, quadrinhos, games. Cobre 'cultura' num sentido mais popular do que erudito.",
+      "active": true
+    },
+
+    {
+      "id": "correio-braziliense",
+      "name": "Correio Braziliense",
+      "type": "rss",
+      "url": "https://www.correiobraziliense.com.br/feed",
+      "region": "brasil",
+      "category_default": "acontecimentos",
+      "trust_score": 72,
+      "opinion_bias": 10,
+      "priority": "normal",
+      "note": "Principal jornal de Brasília, forte em cobertura de política/governo federal.",
+      "active": true
+    },
+    {
+      "id": "gazeta-do-povo",
+      "name": "Gazeta do Povo",
+      "type": "html",
+      "url": "https://www.gazetadopovo.com.br/",
+      "region": "brasil",
+      "category_default": "acontecimentos",
+      "trust_score": 65,
+      "opinion_bias": 30,
+      "priority": "normal",
+      "note": "Jornal de Curitiba com linha editorial declaradamente conservadora desde 2015 (segundo a própria Wikipédia/imprensa). Viés cadastrado mais alto por transparência editorial.",
+      "active": true
+    },
+    {
+      "id": "brasil-de-fato",
+      "name": "Brasil de Fato",
+      "type": "html",
+      "url": "https://www.brasildefato.com.br/",
+      "region": "brasil",
+      "category_default": "acontecimentos",
+      "trust_score": 60,
+      "opinion_bias": 35,
+      "priority": "normal",
+      "note": "Veículo de cobertura voltado a movimentos sociais e pauta popular, com linha editorial declaradamente à esquerda. Viés cadastrado mais alto por transparência editorial — equilibra o viés à direita da Gazeta do Povo/Revista Oeste no conjunto de fontes.",
+      "active": true
+    },
+    {
+      "id": "valor-economico",
+      "name": "Valor Econômico",
+      "type": "html",
+      "url": "https://valor.globo.com/",
+      "region": "brasil",
+      "category_default": "economia",
+      "trust_score": 78,
+      "opinion_bias": 8,
+      "priority": "high",
+      "note": "Principal jornal de economia/negócios do Brasil. Conteúdo majoritariamente pago; resumo pode vir curto.",
       "active": true
     },
 

@@ -30,8 +30,12 @@ const rssParser = new Parser({
   headers: {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
     'Accept': 'application/rss+xml, application/xml, text/xml, */*'
-  },
-  xml2js: { strict: false, trim: true } // alguns feeds (ex: Superesportes) têm XML levemente inválido; modo permissivo evita crash
+  }
+  // OBS: já tivemos "xml2js: { strict:false }" aqui pra tentar salvar o feed
+  // quebrado do Superesportes, mas isso corrompia silenciosamente feeds BEM
+  // formados (G1, BBC, Folha...) — o título vinha vazio e a notícia era
+  // descartada sem nenhum aviso no log. Removido. O Superesportes agora usa
+  // modo "html" em vez de RSS, então não precisa mais desse ajuste.
 });
 
 function log(...args) { console.log('[aggregate]', ...args); }
@@ -127,6 +131,24 @@ function extractFirstImageFromHtml(html, baseUrl) {
   }
 }
 
+// Alguns sites (ex: Superesportes) declaram ou usam codificação Latin-1/
+// Windows-1252 em vez de UTF-8, o que embolava acentos ("Campe�o"). Isso lê
+// o charset certo a partir do cabeçalho da resposta antes de decodificar.
+async function fetchTextSmart(url, headers) {
+  const res = await withTimeout(fetch(url, { headers }), FETCH_TIMEOUT_MS);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const buffer = await res.arrayBuffer();
+  const contentType = res.headers.get('content-type') || '';
+  const match = contentType.match(/charset=([^;]+)/i);
+  let charset = match ? match[1].trim().toLowerCase() : 'utf-8';
+  if (charset === 'iso-8859-1' || charset === 'latin1') charset = 'windows-1252';
+  try {
+    return { text: new TextDecoder(charset).decode(buffer), ok: true };
+  } catch (_) {
+    return { text: new TextDecoder('utf-8').decode(buffer), ok: true };
+  }
+}
+
 async function fetchRss(source) {
   const feed = await withTimeout(rssParser.parseURL(source.url), FETCH_TIMEOUT_MS);
   const items = [];
@@ -163,11 +185,8 @@ async function fetchRss(source) {
 }
 
 async function fetchHtml(source) {
-  const res = await withTimeout(fetch(source.url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' }
-  }), FETCH_TIMEOUT_MS);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const html = await res.text();
+  const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' };
+  const { text: html } = await fetchTextSmart(source.url, headers);
   const $ = cheerio.load(html);
   const base = new URL(source.url);
 
@@ -203,19 +222,23 @@ async function fetchHtml(source) {
   const items = [];
   for (const url of candidates) {
     try {
-      const r = await withTimeout(fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' }
-      }), FETCH_TIMEOUT_MS);
-      if (!r.ok) continue;
-      const pageHtml = await r.text();
+      const { text: pageHtml } = await fetchTextSmart(url, headers);
       const $$ = cheerio.load(pageHtml);
 
-      const title = ($$('meta[property="og:title"]').attr('content') || $$('title').text() || '').trim();
+      const title = ($$('meta[property="og:title"]').attr('content') || $$('title').text() || '')
+        .replace(/\s*[-–]\s*Superesportes\s*$/i, '')
+        .trim();
 
       // rejeita páginas que claramente não são uma notícia (título é só um ano,
       // um número solto, texto genérico de menu/acessibilidade, ou conteúdo adulto)
       if (!title || /^\d{1,4}$/.test(title)) continue;
       if (/(nua|nudez|pelada|sensual|erotic|onlyfans|boquete|nsfw)/i.test(title.toLowerCase())) continue;
+
+      // páginas "especiais"/institucionais que citam um ano antigo no título
+      // (ex: "Atlético Campeão da Copa do Brasil 2014") não são notícia do dia —
+      // se o site não informar uma data real de publicação, descarta.
+      const oldYearMatch = title.match(/\b(19\d{2}|20[0-2]\d)\b/);
+      const mentionsOldYear = oldYearMatch && Number(oldYearMatch[1]) < new Date().getFullYear() - 1;
 
       const NAV_BOILERPLATE = /ir para o (conte[uú]do|menu|busca|rodap[eé])|pular para|acessibilidade/i;
 
@@ -248,6 +271,8 @@ async function fetchHtml(source) {
         $$('time[datetime]').first().attr('datetime') ||
         $$('meta[name="date"]').attr('content') ||
         null;
+
+      if (mentionsOldYear && !explicitDate) continue; // provável página "especial", não notícia
 
       items.push({
         title,
