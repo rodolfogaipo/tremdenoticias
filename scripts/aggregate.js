@@ -20,14 +20,18 @@ const { scoreItem, normalize, classifyCategoryByKeywords } = require('./classifi
 const ROOT = path.resolve(__dirname, '..');
 const SOURCES_PATH = path.join(__dirname, 'sources.json');
 const OUTPUT_PATH = path.join(ROOT, 'docs', 'data', 'news.json');
-const MAX_AGE_DAYS = 12;
-const HTML_MAX_LINKS = 12;
+const MAX_AGE_DAYS = 12;          // até quando um item fica guardado para leitura offline
+const HTML_MAX_LINKS = 12;        // limite de links processados por fonte "html"
 const FETCH_TIMEOUT_MS = 15000;
-const SUMMARY_MAX_LEN = 600;
+const SUMMARY_MAX_LEN = 600;      // limite "macio" do resumo (corta em frase/palavra, não no meio)
 
 const rssParser = new Parser({
   timeout: FETCH_TIMEOUT_MS,
-  headers: { 'User-Agent': 'TremDeNoticiasBot/1.0 (+agregador de RSS publico)' }
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+    'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+  },
+  xml2js: { strict: false, trim: true } // alguns feeds (ex: Superesportes) têm XML levemente inválido; modo permissivo evita crash
 });
 
 function log(...args) { console.log('[aggregate]', ...args); }
@@ -37,11 +41,32 @@ function hashId(str) {
   return crypto.createHash('sha1').update(str).digest('hex').slice(0, 16);
 }
 
-function stripHtml(html) {
-  if (!html) return '';
-  return cheerio.load(`<div>${html}</div>`)('div').text().replace(/\s+/g, ' ').trim();
+function safeStr(v) {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  try {
+    // alguns feeds (ex: Agência Brasil) retornam campos como objeto
+    // ({_: 'texto', $: {...}}) em vez de string pura — isso cobre os casos comuns.
+    if (typeof v === 'object' && '_' in v) return String(v._ ?? '');
+    return String(v);
+  } catch (_) {
+    return '';
+  }
 }
 
+function stripHtml(html) {
+  const str = safeStr(html);
+  if (!str) return '';
+  try {
+    return cheerio.load(`<div>${str}</div>`)('div').text().replace(/\s+/g, ' ').trim();
+  } catch (_) {
+    return str.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  }
+}
+
+// Corta um texto de forma "inteligente": tenta parar num fim de frase (. ! ?)
+// dentro do limite; se não achar, corta na última palavra inteira; nunca corta
+// uma palavra ao meio.
 function smartTruncate(text, maxLen) {
   const clean = (text || '').trim();
   if (clean.length <= maxLen) return clean;
@@ -80,6 +105,8 @@ async function withTimeout(promise, ms) {
   ]);
 }
 
+// Tenta achar uma imagem "de verdade" dentro de um HTML de conteúdo (usado
+// quando o RSS não traz enclosure/media:content, caso comum do G1 e outros).
 function extractFirstImageFromHtml(html, baseUrl) {
   if (!html) return null;
   try {
@@ -96,36 +123,40 @@ async function fetchRss(source) {
   const feed = await withTimeout(rssParser.parseURL(source.url), FETCH_TIMEOUT_MS);
   const items = [];
   for (const entry of feed.items || []) {
-    const title = (entry.title || '').trim();
-    if (!title) continue;
-    const rawContentHtml = entry['content:encoded'] || entry.content || entry.summary || '';
-    const summary = stripHtml(entry.contentSnippet || rawContentHtml);
-    const link = entry.link || entry.guid || '';
+    try {
+      const title = safeStr(entry.title).trim();
+      if (!title) continue;
+      const rawContentHtml = safeStr(entry['content:encoded'] || entry.content || entry.summary || '');
+      const summary = stripHtml(safeStr(entry.contentSnippet) || rawContentHtml);
+      const link = safeStr(entry.link || entry.guid || '');
 
-    let image =
-      (entry.enclosure && entry.enclosure.url) ||
-      (entry['media:content'] && entry['media:content'].$ && entry['media:content'].$.url) ||
-      (entry['media:thumbnail'] && entry['media:thumbnail'].$ && entry['media:thumbnail'].$.url) ||
-      null;
-    if (!image) image = extractFirstImageFromHtml(rawContentHtml, link);
+      let image =
+        (entry.enclosure && entry.enclosure.url) ||
+        (entry['media:content'] && entry['media:content'].$ && entry['media:content'].$.url) ||
+        (entry['media:thumbnail'] && entry['media:thumbnail'].$ && entry['media:thumbnail'].$.url) ||
+        null;
+      if (!image) image = extractFirstImageFromHtml(rawContentHtml, link);
 
-    const publishedAt = entry.isoDate || entry.pubDate || new Date().toISOString();
-    items.push({
-      title,
-      summary: smartTruncate(summary, SUMMARY_MAX_LEN),
-      link,
-      image,
-      publishedAt,
-      dateIsReal: true,
-      sectionHint: (entry.categories || []).join(' ')
-    });
+      const publishedAt = entry.isoDate || entry.pubDate || new Date().toISOString();
+      items.push({
+        title,
+        summary: smartTruncate(summary, SUMMARY_MAX_LEN),
+        link,
+        image,
+        publishedAt,
+        dateIsReal: true, // RSS quase sempre traz data real de publicação
+        sectionHint: Array.isArray(entry.categories) ? entry.categories.map(safeStr).join(' ') : ''
+      });
+    } catch (e) {
+      // um item malformado dentro do feed não deve derrubar a fonte inteira
+    }
   }
   return items;
 }
 
 async function fetchHtml(source) {
   const res = await withTimeout(fetch(source.url, {
-    headers: { 'User-Agent': 'TremDeNoticiasBot/1.0 (+agregador de conteudo publico)' }
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' }
   }), FETCH_TIMEOUT_MS);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
@@ -137,6 +168,9 @@ async function fetchHtml(source) {
     let href = $(el).attr('href');
     if (!href) return;
     const anchorText = $(el).text().replace(/\s+/g, ' ').trim();
+    // notícias de verdade têm o título inteiro como texto do link (uma frase);
+    // itens de menu/institucionais ("Anteriores", "Regimento Interno", "Contato")
+    // são curtos — isso filtra a maior parte do lixo de navegação.
     if (anchorText.split(' ').length < 5 || anchorText.length < 25) return;
     try {
       const abs = new URL(href, base).toString();
@@ -144,11 +178,13 @@ async function fetchHtml(source) {
       if (u.hostname !== base.hostname) return;
       if (/\.(jpg|jpeg|png|gif|pdf|css|js)$/i.test(u.pathname)) return;
       if (u.pathname === '/' || u.pathname.length < 12) return;
+      // ignora páginas de arquivo/navegação/institucionais
       const lastSegment = u.pathname.split('/').filter(Boolean).pop() || '';
-      if (/^\d{4}$/.test(lastSegment)) return;
+      if (/^\d{4}$/.test(lastSegment)) return; // parece um "ano" isolado
       if (/(^|[?&])(ano|year|page|pagina)=/i.test(u.search)) return;
       if (/\/(tag|tags|categoria|category|arquivo|archive|page|pagina)\//i.test(u.pathname)) return;
       if (/(regimento|transparencia|licitac|legislac|servidor|ouvidoria|contato|institucional|estrutura|comiss|estatuto|sobre-a|historia)/i.test(u.pathname)) return;
+      // conteúdo adulto/sensual não é notícia — nunca deixa passar, mesmo que o site misture isso na home
       if (/(nua|nudez|pelada|sensual|erotic|onlyfans|adulto|boquete|sexo|nsfw|hot-|-hot\b)/i.test(u.pathname + ' ' + anchorText.toLowerCase())) return;
       links.add(abs.split('#')[0]);
     } catch (_) { /* ignore invalid urls */ }
@@ -159,7 +195,7 @@ async function fetchHtml(source) {
   for (const url of candidates) {
     try {
       const r = await withTimeout(fetch(url, {
-        headers: { 'User-Agent': 'TremDeNoticiasBot/1.0 (+agregador de conteudo publico)' }
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' }
       }), FETCH_TIMEOUT_MS);
       if (!r.ok) continue;
       const pageHtml = await r.text();
@@ -167,6 +203,8 @@ async function fetchHtml(source) {
 
       const title = ($$('meta[property="og:title"]').attr('content') || $$('title').text() || '').trim();
 
+      // rejeita páginas que claramente não são uma notícia (título é só um ano,
+      // um número solto, texto genérico de menu/acessibilidade, ou conteúdo adulto)
       if (!title || /^\d{1,4}$/.test(title)) continue;
       if (/(nua|nudez|pelada|sensual|erotic|onlyfans|boquete|nsfw)/i.test(title.toLowerCase())) continue;
 
@@ -176,6 +214,8 @@ async function fetchHtml(source) {
                      $$('meta[name="description"]').attr('content') || '';
       if (summary && NAV_BOILERPLATE.test(summary)) summary = '';
       if (!summary || summary.length < 60) {
+        // fallback: pega o primeiro parágrafo "de verdade" do corpo da página,
+        // pulando textos de navegação/acessibilidade
         const firstParagraph = $$('article p, .content p, .post-content p, .entry-content p, p')
           .filter((_, el) => {
             const t = $$(el).text().trim();
@@ -184,7 +224,7 @@ async function fetchHtml(source) {
           .first().text().trim();
         if (firstParagraph) summary = firstParagraph;
       }
-      if (!summary || NAV_BOILERPLATE.test(summary)) continue;
+      if (!summary || NAV_BOILERPLATE.test(summary)) continue; // sem conteúdo de verdade, pula
 
       const image =
         $$('meta[property="og:image"]').attr('content') ||
@@ -192,6 +232,7 @@ async function fetchHtml(source) {
         extractFirstImageFromHtml($$('article').html() || pageHtml, url) ||
         null;
 
+      // tenta várias formas comuns de expor a data real de publicação
       const explicitDate =
         $$('meta[property="article:published_time"]').attr('content') ||
         $$('meta[itemprop="datePublished"]').attr('content') ||
@@ -267,6 +308,10 @@ function buildItem(raw) {
   };
 }
 
+// Evita que a mesma notícia (mesmo link -> mesmo id) "rejuveneça" a cada
+// execução: se já vimos esse id antes e a fonte não tem data real de
+// publicação (dateIsReal=false), reaproveita a data da primeira vez que
+// coletamos, em vez de carimbar "agora" de novo.
 function stabilizeDates(freshItems, previousItems) {
   const previousById = new Map(previousItems.map(it => [it.id, it]));
   return freshItems.map(item => {
@@ -275,11 +320,12 @@ function stabilizeDates(freshItems, previousItems) {
     if (prev) {
       return { ...item, publishedAt: prev.publishedAt };
     }
-    return item;
+    return item; // primeira vez que vemos: fica com "agora" mesmo (data de coleta)
   });
 }
 
 function dedupe(items) {
+  // 1ª passada: mesmo link (mesmo id) é sempre a mesma notícia — nunca duplica.
   const byId = new Map();
   for (const item of items) {
     const existing = byId.get(item.id);
@@ -294,6 +340,7 @@ function dedupe(items) {
   }
   const uniqueById = [...byId.values()];
 
+  // 2ª passada: mesma notícia via fontes diferentes (links diferentes, título parecido, mesmo dia)
   const sorted = uniqueById.sort((a, b) => b.reliabilityScore - a.reliabilityScore);
   const kept = [];
   const keys = sorted.map(it => normalizeTitleKey(it.title));
