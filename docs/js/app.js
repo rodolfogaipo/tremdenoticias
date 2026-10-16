@@ -119,7 +119,7 @@ async function loadData(isRefresh) {
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     let res;
     try {
-      res = await fetch(url, { signal: controller.signal });
+      res = await fetch(url, { signal: controller.signal, cache: isRefresh ? 'no-store' : 'default' });
     } finally {
       clearTimeout(timeoutId);
     }
@@ -129,6 +129,10 @@ async function loadData(isRefresh) {
     if (!json || !Array.isArray(json.items)) throw new Error('JSON inválido');
     state.data = json;
     renderAll();
+    if (isRefresh) {
+      const el = document.getElementById('lastUpdateText');
+      if (el) el.textContent = 'Verificado agora · ' + formatUpdateLine(json) + ' · ' + json.items.length + ' notícias';
+    }
     checkUrgentNotifications(json.items);
 
     // Se o que veio está vazio ou velho (cache antigo do aparelho) e há internet,

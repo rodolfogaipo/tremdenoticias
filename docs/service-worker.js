@@ -4,7 +4,7 @@
    - data/news.json: stale-while-revalidate (mostra cache na hora,
      atualiza em segundo plano quando há internet) */
 
-const VERSION = 'v5';
+const VERSION = 'v6';
 const SHELL_CACHE = `tn-shell-${VERSION}`;
 const DATA_CACHE = `tn-data-${VERSION}`;
 
@@ -59,7 +59,7 @@ self.addEventListener('fetch', (event) => {
           // botão "Atualizar": busca na rede AGORA e só volta pra tela quando
           // tiver a resposta de verdade (nada de "atualiza só na próxima vez")
           try {
-            const res = await fetch(event.request);
+            const res = await fetch(event.request, { cache: 'no-store' });
             if (res.ok) cache.put(canonicalUrl, res.clone());
             return res;
           } catch (_) {
