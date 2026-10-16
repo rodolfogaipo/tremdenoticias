@@ -100,24 +100,58 @@ window.addEventListener('online', () => { updateOnlineStatus(); loadData(true); 
 window.addEventListener('offline', updateOnlineStatus);
 
 /* ---------------- Data loading ---------------- */
+let autoRefreshed = false;
 async function loadData(isRefresh) {
   const btn = document.getElementById('refreshBtn');
   if (isRefresh) btn.classList.add('spinning');
+  const emptyState = document.getElementById('emptyState');
   try {
     // ?fresh=1 avisa o service worker (ver docs/service-worker.js) que essa
     // é uma atualização pedida na hora pelo botão — sem isso, ele mostrava o
     // cache velho e só atualizava "pra próxima vez", como se o botão não
     // funcionasse de verdade.
     const url = isRefresh ? `${DATA_URL}?fresh=${Date.now()}` : DATA_URL;
-    const res = await fetch(url);
+
+    // Numa conexão muito ruim (3G fraco, etc.), o fetch pode ficar "pendurado"
+    // sem nunca dar certo nem falhar — sem isso, o app travava no "Carregando..."
+    // pra sempre, mesmo tendo notícias salvas offline pra mostrar.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    let res;
+    try {
+      res = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
+    if (!json || !Array.isArray(json.items)) throw new Error('JSON inválido');
     state.data = json;
     renderAll();
     checkUrgentNotifications(json.items);
+
+    // Se o que veio está vazio ou velho (cache antigo do aparelho) e há internet,
+    // busca uma vez a versão mais nova direto da rede, sem o usuário precisar apertar nada.
+    if (!isRefresh && !autoRefreshed && navigator.onLine) {
+      const gen = json.generatedAt ? new Date(json.generatedAt).getTime() : 0;
+      if (!json.items.length || Date.now() - gen > 60 * 60 * 1000) {
+        autoRefreshed = true;
+        loadData(true);
+      }
+    }
   } catch (e) {
     if (!state.data) {
       document.getElementById('lastUpdateText').textContent =
         'Não foi possível carregar notícias (sem conexão e sem cache local ainda).';
+      document.getElementById('heroSlot').innerHTML = '';
+      document.getElementById('feedList').innerHTML = '';
+      if (emptyState) {
+        emptyState.style.display = 'block';
+        emptyState.querySelector('h3').textContent = 'Sem conexão e sem notícias salvas';
+        emptyState.querySelector('p').textContent =
+          'Assim que a internet melhorar, toque em Atualizar. Notícias já lidas antes continuam disponíveis em Salvos e Histórico.';
+      }
     }
   } finally {
     if (isRefresh) btn.classList.remove('spinning');
@@ -138,7 +172,10 @@ function formatRelativeTime(iso) {
 function formatUpdateLine(json) {
   if (!json) return '';
   const dt = new Date(json.generatedAt);
-  const time = dt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const time = isNaN(dt) ? '—' : dt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const ageH = json.generatedAt ? (Date.now() - dt.getTime()) / 3600000 : 999;
+  const stale = document.getElementById('staleBanner');
+  if (stale) stale.classList.toggle('show', ageH > 6 || !json.items.length);
   const seedNote = json.isSeedData ? ' · dados de exemplo (aguardando 1ª coleta automática)' : '';
   return `Atualizado ${time}${seedNote}`;
 }
@@ -177,7 +214,13 @@ function getFilteredItems() {
   const blocked = new Set(getBlockedSources());
   const q = state.query.trim().toLowerCase();
 
-  let items = state.data.items.filter(it => {
+  const RECENT_MS = 48 * 60 * 60 * 1000;
+  const now = Date.now();
+  const isRecent = it => {
+    const t = new Date(it.publishedAt).getTime();
+    return !isNaN(t) && now - t <= RECENT_MS;
+  };
+  const baseFilter = it => {
     if (blocked.has(it.sourceId)) return false;
     if (!passesEditorialFilter(it)) return false;
 
@@ -196,7 +239,14 @@ function getFilteredItems() {
       if (!hay.includes(q)) return false;
     }
     return true;
-  });
+  };
+  let items = state.data.items.filter(baseFilter);
+  // Só notícias recentes (últimas 48h); ao buscar por texto, procura em tudo.
+  // Se nada for recente (coletor parado), mostra o que houver em vez de tela em branco.
+  if (!q) {
+    const recent = items.filter(isRecent);
+    if (recent.length || !state.data.items.some(isRecent)) items = recent.length ? recent : items;
+  }
 
   items.sort((a, b) => {
     if (priorityLocalEnabled()) {

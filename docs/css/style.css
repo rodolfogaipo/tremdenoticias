@@ -369,3 +369,5 @@ img { max-width: 100%; display: block; }
 @media (min-width: 760px) {
   .app-main { padding-top: 18px; }
 }
+
+.stale-banner { background:#b45309; color:#fff; }

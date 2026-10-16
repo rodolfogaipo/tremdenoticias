@@ -4,7 +4,7 @@
    - data/news.json: stale-while-revalidate (mostra cache na hora,
      atualiza em segundo plano quando há internet) */
 
-const VERSION = 'v3';
+const VERSION = 'v5';
 const SHELL_CACHE = `tn-shell-${VERSION}`;
 const DATA_CACHE = `tn-data-${VERSION}`;
 
